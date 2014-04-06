@@ -81,11 +81,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
 		var box = lettersGridModel[row][col];
 
+		if (!box.letter) {
+			return;
+		}
+
 		currentlyHeldLetter = box.letter;
+
+		delete box.letter;
 
 	});
 
 	var letterMouseUpListener = canvas.addEventListener('mouseup', function (clickEvent) {
+		if (!currentlyHeldLetter) {
+			return;
+		}
+
 		var x = clickEvent.offsetX;
 		var y = clickEvent.offsetY;
 
@@ -102,6 +112,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 	function renderModel (context, model) {
+		context.fillStyle = "white";
+		context.fillRect(0, 0, 500, 600);
+
 		model.forEach(function (row, _row) {
 			row.forEach(function (box, _col) {
 				// debugger;
