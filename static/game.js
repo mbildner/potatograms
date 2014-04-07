@@ -50,6 +50,18 @@ document.addEventListener('DOMContentLoaded', function () {
 		return [x, y];
 	}
 
+	function renderFloatingTile (context, letter, color, x, y) {
+		var letterX = x + tileWidth/2;
+		var letterY = y + tileHeight/2 + 5;
+
+		context.fillStyle = color || 'black';
+		context.font="20px Georgia";
+		context.textAlign = "center";
+		context.fillRect(x, y, tileWidth, tileHeight);
+		context.fillStyle = "black";
+		context.fillText(letter, letterX, letterY);
+	}
+
 	function renderTile (context, letter, color, row, col) {
 		var position = findPositionFromCoords([row, col]);
 		var x = position[0];
@@ -70,14 +82,42 @@ document.addEventListener('DOMContentLoaded', function () {
 
 	renderAllHeldTiles(boardContext, letters);
 
+
+	var currentlyHeldLetterCol;
+	var currentlyHeldLetterRow;
 	var currentlyHeldLetter;
+	var tileOffsetX;
+	var tileOffsetY;
+
+	var letterMouseMoveListener = canvas.addEventListener('mousemove', function (moveEvent) {
+		if (!currentlyHeldLetter) {
+			return;
+		}
+
+		var x = moveEvent.offsetX - tileOffsetX;
+		var y = moveEvent.offsetY - tileOffsetY;
+
+		var floatingGreen = "rgba(0, 255, 0, .5)";
+
+		clearBoard(boardContext);
+		renderModel(boardContext, lettersGridModel);
+		renderFloatingTile(boardContext, currentlyHeldLetter, floatingGreen, x, y);
+
+	});
+
 
 	var letterMouseDownListener = canvas.addEventListener('mousedown', function (clickEvent) {
 		var x = clickEvent.offsetX;
 		var y = clickEvent.offsetY;
 
+		tileOffsetX = x % tileWidth;
+		tileOffsetY = y % tileHeight;
+
 		var col = Math.floor(x / tileWidth);
 		var row = Math.floor(y / tileHeight);
+
+		currentlyHeldLetterCol = col;
+		currentlyHeldLetterRow = row;
 
 		var box = lettersGridModel[row][col];
 
@@ -104,20 +144,71 @@ document.addEventListener('DOMContentLoaded', function () {
 
 		var box = lettersGridModel[row][col];
 
-		box.letter = currentlyHeldLetter;
-		currentlyHeldLetter = undefined;
+		if (box.letter) {
+			// user tries to drop letter where there already is one
+			// return it to its original box, delete currentlyHeldLetter
+			var originalBox = lettersGridModel[currentlyHeldLetterRow][currentlyHeldLetterCol];
+			originalBox.letter = currentlyHeldLetter;
+			currentlyHeldLetter = undefined;
+			renderModel(boardContext, lettersGridModel);
+			return;
+		}
 
+		box.letter = currentlyHeldLetter;
+
+		currentlyHeldLetter = undefined;
 		renderModel(boardContext, lettersGridModel);
+
+		var lettersInTray = getLettersFromTray(lettersGridModel);
+		condenseLettersTray(lettersGridModel);
+
 	});
 
+	function condenseLettersTray (lettersGridModel) {
+		var lettersInTray = getLettersFromTray(lettersGridModel);
 
-	function renderModel (context, model) {
+		var lettersTrayRows = lettersGridModel.filter(function (row) {
+			return row.some(function (box) {
+				return box.letterHeldIn === 'tray';
+			});
+		});
+
+		var emptyBoxes = lettersTrayRows.reduce(function (row1, row2) {
+			return row1.concat(row2).filter(function (box) {
+				return typeof(box.letter) === 'undefined';
+			});
+		});
+
+	}
+
+
+	function getLettersFromTray (lettersGridModel) {
+		var flattenedBoxesArray = lettersGridModel.reduce(function (row1, row2) {
+			return row1.concat(row2);
+		});
+
+		var fullTrayBoxes = flattenedBoxesArray.filter(function (box) {
+			return box.letter && box.letterHeldIn === 'tray';
+		});
+
+		var lettersArray = fullTrayBoxes.map(function (box) {
+			return box.letter;
+		});
+
+		return lettersArray;
+	}
+
+	function clearBoard (context) {
 		context.fillStyle = "white";
 		context.fillRect(0, 0, 500, 600);
+	}
+
+	function renderModel (context, model) {
+
+		clearBoard(boardContext);
 
 		model.forEach(function (row, _row) {
 			row.forEach(function (box, _col) {
-				// debugger;
 				var color = box.letterHeldIn === 'tray' ? 'purple' : 'red';
 				var letter = box.letter;
 
@@ -126,8 +217,6 @@ document.addEventListener('DOMContentLoaded', function () {
 				}
 
 				renderTile(context, letter, color, _row, _col);
-
-
 
 			});
 		});	
